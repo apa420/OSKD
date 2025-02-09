@@ -1,5 +1,14 @@
+"use strict";
 // HTML References.
 const container = document.getElementById("keys");
+
+/*
+ * TODO: 
+ * [ ] 1. make divs float (rotate with sin + move up and down)
+ * [x] 2. Option to enable multiplier x23
+ * [x] 3. Adding your own keyrepeat rate (or get it somehow)
+ * [ ] 4. Make shift be a separate config that you can set to just be the big version of letter
+ */
 
 // Config provider.
 let config = {
@@ -14,6 +23,10 @@ let config = {
 function setConfig(newConfig) {
     config = newConfig;
     container.classList.add(config.options.rowLayout);
+
+    if (config.options.enableRepeat === true) {
+        setInterval(repeatKeys, 17);
+    }
 }
 
 fetch("/config.json")
@@ -54,8 +67,12 @@ const data = {
     modifiers: [],
     modChanged: true,
     repeat: 1,
+    repeatStarted: new Date(),
+    repeatLast: new Date(),
+    repeatPastDelay: false,
+    repeatComboString: "",
     prevElement: null,
-    prevCommon: false,
+    keyDown: false,
     keys: []
 };
 
@@ -63,10 +80,94 @@ function isCommon(keyName) {
     return COMMONS.includes(keyName);
 }
 
+function createDisplayText(parsedKey) {
+    let displayText = "";
+    data.modifiers = data.modifiers.sort(sortModifiers);
+
+    for (const mod of data.modifiers) {
+        displayText += mapKey(mod, data.modifiers) + " + ";
+    }
+    displayText += parsedKey;
+    return displayText;
+
+}
+
+function createNewBlock(parsedKey) {
+    const keyElement = document.createElement("div");
+    keyElement.classList.add("key");
+    applyConfigStyling(keyElement);
+
+    keyElement.innerText += createDisplayText(parsedKey);
+
+    data.keys.push(keyElement);
+    container.appendChild(keyElement);
+    data.prevElement = keyElement;
+
+    if (data.keys.length > 20) {
+        data.keys.shift().remove();
+    }
+}
+
+function updateRepeatComboString() {
+    if (config.options.comboRepeat) {
+        let ln = data.repeatComboString.length;
+
+        if (ln === 0 && config.options.separateRepeats) {
+            let parsedLastKey = mapKey(data.lastKey);
+            let lastKeyText = createDisplayText(parsedLastKey)
+            let keyLength = lastKeyText.length;
+            if (keyLength < data.prevElement.innerText.length) {
+                data.prevElement.innerText =
+                    data.prevElement.innerText.substring(0, data.prevElement.innerText.length - parsedLastKey.length);
+                createNewBlock(parsedLastKey);
+            }
+        }
+        data.repeatComboString = " x" + data.repeat;
+        data.prevElement.innerText = 
+            data.prevElement.innerText.substring(0, data.prevElement.innerText.length - ln) +
+                data.repeatComboString;
+    }
+}
+
+function repeatKeys() {
+    if (data.keyDown) {
+        if (data.modChanged === true) {
+            handleKeyPress(data.lastKey);
+        }
+        let rn = Date.now();
+        let newLast = new Date(data.repeatLast.getTime());
+        let didDelay = rn - data.repeatStarted - config.options.repeatDelay;
+
+        let editOutput = false;
+
+        if (didDelay > 0) {
+            if (!data.repeatPastDelay) {
+                data.repeat++;
+                editOutput = true;
+                data.repeatPastDelay = true;
+                newLast = new Date(data.repeatLast.valueOf() + config.options.repeatDelay);
+            }
+
+            let msDiff = rn - newLast - config.options.repeatDelay;
+            let rep = Math.floor(msDiff / config.options.repeatRate);
+            newLast = new Date(newLast.valueOf() + rep * config.options.repeatRate);
+            if (rep > 0) {
+                editOutput = true;
+                data.repeat += rep;
+            }
+            data.repeatPastDelay = true;
+        }
+        data.repeatLast = newLast;
+        if (editOutput) {
+            updateRepeatComboString();
+        }
+    }
+}
+
 
 function mapKey(keyName, modifiers) {
     let shiftPressed = false;
-    if (modifiers.includes("Shift_L") || modifiers.includes("Shift_R")) {
+    if (data.modifiers.includes("Shift_L") || data.modifiers.includes("Shift_R")) {
         shiftPressed = true;
     }
 
@@ -83,7 +184,6 @@ function mapKey(keyName, modifiers) {
     } else if (keyName.length === 1) {
         let charVal = keyName.charCodeAt(0);
         if (64 < charVal && charVal < 91) {
-            console.log("keycode!!");
             return String.fromCharCode(keyName.charCodeAt(0) + 32);
         }
     }
@@ -93,45 +193,60 @@ function mapKey(keyName, modifiers) {
 function onKeyPress(keyName) {
     if (config.modifierKeys.hasOwnProperty(keyName)) {
         data.modChanged = true;
-        data.prevCommon = false;
         data.modifiers.push(keyName);
         return;
     }
+
+    if (config.options.enableRepeat) {
+        if (data.repeat > 1 && keyName !== data.lastKey) {
+            data.modChanged = true;
+        }
+    }
+    handleKeyPress(keyName);
+}
+
+function handleKeyPress(keyName) {
     let parsedKey = mapKey(keyName, data.modifiers);
 
-    if (data.modChanged === true || data.prevCommon !== isCommon(parsedKey)) {
-        const keyElement = document.createElement("div");
-        keyElement.classList.add("key");
-        applyConfigStyling(keyElement);
+    if (data.modChanged === true) {
+        createNewBlock(parsedKey);
 
-        data.modifiers = data.modifiers.sort(sortModifiers);
+        data.repeat = 1;
+        data.repeatComboString = "";
 
-        for (const mod of data.modifiers) {
-            keyElement.innerText += mapKey(mod, data.modifiers) + " + ";
-        }
-        keyElement.innerText += parsedKey;
-
-        data.keys.push(keyElement);
-        container.appendChild(keyElement);
-        prevElement = keyElement;
-
-        if (data.keys.length > 20) {
-            data.keys.shift().remove();
-        }
-    } else {
-        prevElement.innerText += parsedKey;
     }
 
+    // repeat
+    if (config.options.enableRepeat) {
+        if (keyName === data.lastKey && data.modChanged === false) {
+            data.repeat++;
+            data.repeatStarted = new Date(Date.now());
+            data.repeatLast = new Date(Date.now());
+            data.repeatPastDelay = false;
+            updateRepeatComboString();
+        } else {
+            if (data.modChanged === false) {
+                data.prevElement.innerText += parsedKey;
+            }
+            data.repeat = 1;
+            data.repeatComboString = "";
+            data.repeatStarted = new Date(Date.now());
+            data.repeatLast = new Date(Date.now());
+            data.repeatPastDelay = false;
+        }
+    } else {
+        if (data.modChanged === false) {
+            data.prevElement.innerText += parsedKey;
+        }
+    }
 
-
-
-    if (prevElement.innerText.length > 20) {
+    if (data.prevElement.innerText.length > config.options.maxLength) {
         data.modChanged = true;
     } else {
         data.modChanged = false;
     }
-    data.prevCommon = isCommon(keyName);
     data.lastKey = keyName;
+    data.keyDown = true;
 }
 
 function onKeyRelease(keyName) {
@@ -139,6 +254,8 @@ function onKeyRelease(keyName) {
     if (index !== -1) {
         data.modifiers.splice(index, 1);
         data.modChanged = true;
+    } else {
+        data.keyDown = false;
     }
 }
 

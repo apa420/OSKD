@@ -1,6 +1,12 @@
 {
   "options": {
-    "rowLayout": "right-to-left"
+    "rowLayout": "right-to-left",
+    "repeatRate": 75,
+    "repeatDelay": 160,
+    "enableRepeat": true,
+    "comboRepeat": true,
+    "separateRepeats": true,
+    "maxLength": 20
   },
   "modifierKeys": {
     "Control_L": 6,
@@ -15,7 +21,7 @@
   "keyMapping": {
     "Control_L": "Ctrl",
     "Control_R": "Ctrl",
-    "Escape": "Esc",
+    "Escape": "Esc ",
     "Shift_L": "Shift",
     "Shift_R": "Shift",
     "Up": "▲",
@@ -29,7 +35,7 @@
     "Super_L": "⊞",
     "Super_R": "⊞",
     "Space": "―",
-    "CapsLock": "Caps",
+    "CapsLock": "Caps ",
     "apostrophe": "'",
     "backslash": "\\",
     "bracketleft": "[",
@@ -42,7 +48,9 @@
     "semicolon": ";",
     "slash": "/",
     "space": "␣",
-    "BackSpace": "⌫"
+    "BackSpace": "⌫",
+    "Delete": "⌦",
+    "Insert": "Ins "
   },
   "keyStyle": {
     "fontSize": "1rem",
