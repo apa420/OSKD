@@ -25,6 +25,7 @@ function setConfig(newConfig) {
     container.classList.add(config.options.rowLayout);
 
     if (config.options.enableRepeat === true) {
+        data.repeatRateMs = 1000.0 / config.options.repeatRate;
         setInterval(repeatKeys, 17);
     }
 }
@@ -71,6 +72,7 @@ const data = {
     repeatLast: new Date(),
     repeatPastDelay: false,
     repeatComboString: "",
+    repeatRateMs: 10,
     prevElement: null,
     keyDown: false,
     shiftChanged: false,
@@ -168,9 +170,9 @@ function repeatKeys() {
                 newLast = new Date(data.repeatLast.valueOf() + config.options.repeatDelay);
             }
 
-            let msDiff = rn - newLast - config.options.repeatDelay;
-            let rep = Math.floor(msDiff / config.options.repeatRate);
-            newLast = new Date(newLast.valueOf() + rep * config.options.repeatRate);
+            let msDiff = rn - newLast;
+            let rep = Math.floor(msDiff / data.repeatRateMs);
+            newLast = new Date(newLast.valueOf() + rep * data.repeatRateMs);
             if (rep > 0) {
                 editOutput = true;
                 data.repeat += rep;
