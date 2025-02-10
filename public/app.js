@@ -7,7 +7,7 @@ const container = document.getElementById("keys");
  * [ ] 1. make divs float (rotate with sin + move up and down)
  * [x] 2. Option to enable multiplier x23
  * [x] 3. Adding your own keyrepeat rate (or get it somehow)
- * [ ] 4. Make shift be a separate config that you can set to just be the big version of letter
+ * [x] 4. Make shift be a separate config that you can set to just be the big version of letter
  */
 
 // Config provider.
@@ -73,6 +73,7 @@ const data = {
     repeatComboString: "",
     prevElement: null,
     keyDown: false,
+    shiftChanged: false,
     keys: []
 };
 
@@ -85,7 +86,9 @@ function createDisplayText(parsedKey) {
     data.modifiers = data.modifiers.sort(sortModifiers);
 
     for (const mod of data.modifiers) {
-        displayText += mapKey(mod, data.modifiers) + " + ";
+        if (config.options.shiftNotRealModifier === false || !(mod === "Shift_L" || mod === "Shift_R")) {
+            displayText += mapKey(mod, data.modifiers) + " + ";
+        }
     }
     displayText += parsedKey;
     return displayText;
@@ -103,17 +106,24 @@ function createNewBlock(parsedKey) {
     container.appendChild(keyElement);
     data.prevElement = keyElement;
 
-    if (data.keys.length > 20) {
+    if (data.keys.length > config.options.maxElements) {
         data.keys.shift().remove();
     }
 }
 
-function updateRepeatComboString() {
+function updateRepeatOutput() {
+    let parsedLastKey = mapKey(data.lastKey);
+
     if (config.options.comboRepeat) {
         let ln = data.repeatComboString.length;
 
-        if (ln === 0 && config.options.separateRepeats) {
-            let parsedLastKey = mapKey(data.lastKey);
+        if (config.options.shiftNotRealModifier && data.shiftChanged) {
+            data.shiftChanged = false;
+            data.repeat = 1;
+            createNewBlock(parsedLastKey);
+            data.repeatComboString = "";
+            ln = 0;
+        } else if (ln === 0 && config.options.separateRepeats) {
             let lastKeyText = createDisplayText(parsedLastKey)
             let keyLength = lastKeyText.length;
             if (keyLength < data.prevElement.innerText.length) {
@@ -122,10 +132,20 @@ function updateRepeatComboString() {
                 createNewBlock(parsedLastKey);
             }
         }
-        data.repeatComboString = " x" + data.repeat;
-        data.prevElement.innerText = 
-            data.prevElement.innerText.substring(0, data.prevElement.innerText.length - ln) +
-                data.repeatComboString;
+        if (data.repeat > 1) {
+            data.repeatComboString = " x" + data.repeat;
+            data.prevElement.innerText = 
+                data.prevElement.innerText.substring(0, data.prevElement.innerText.length - ln) +
+                    data.repeatComboString;
+        }
+    } else {
+        breakIfNeeded(data.lastKey, parsedLastKey);
+        if (data.modChanged === true) {
+            createNewBlock(parsedLastKey);
+            data.modChanged = false;
+        } else {
+            data.prevElement.innerText += parsedLastKey;
+        }
     }
 }
 
@@ -159,16 +179,16 @@ function repeatKeys() {
         }
         data.repeatLast = newLast;
         if (editOutput) {
-            updateRepeatComboString();
+            updateRepeatOutput();
         }
     }
 }
 
 
 function mapKey(keyName, modifiers) {
-    let shiftPressed = false;
+    let shiftHeld = false;
     if (data.modifiers.includes("Shift_L") || data.modifiers.includes("Shift_R")) {
-        shiftPressed = true;
+        shiftHeld = true;
     }
 
     let mapped = config.keyMapping[keyName];
@@ -176,23 +196,24 @@ function mapKey(keyName, modifiers) {
         return mapped;
     }
 
-    if (shiftPressed) {
+    if (shiftHeld) {
         let mappedShift = config.shiftKey[keyName];
         if (mappedShift) {
             return mappedShift;
         }
     } else if (keyName.length === 1) {
-        let charVal = keyName.charCodeAt(0);
-        if (64 < charVal && charVal < 91) {
-            return String.fromCharCode(keyName.charCodeAt(0) + 32);
-        }
+        return keyName.toLowerCase();
     }
     return keyName;
 }
 
 function onKeyPress(keyName) {
     if (config.modifierKeys.hasOwnProperty(keyName)) {
-        data.modChanged = true;
+        if (!(config.options.shiftNotRealModifier && (keyName === "Shift_L" || keyName === "Shift_R"))) {
+            data.modChanged = true;
+        } else {
+            data.shiftChanged = true;
+        }
         data.modifiers.push(keyName);
         return;
     }
@@ -203,6 +224,14 @@ function onKeyPress(keyName) {
         }
     }
     handleKeyPress(keyName);
+}
+
+function breakIfNeeded(keyName, parsedKey) {
+    if ((data.prevElement.innerText.length + parsedKey.length) > config.options.maxLength || config.breakOnInput.includes(keyName)) {
+        data.modChanged = true;
+    } else {
+        data.modChanged = false;
+    }
 }
 
 function handleKeyPress(keyName) {
@@ -223,7 +252,7 @@ function handleKeyPress(keyName) {
             data.repeatStarted = new Date(Date.now());
             data.repeatLast = new Date(Date.now());
             data.repeatPastDelay = false;
-            updateRepeatComboString();
+            updateRepeatOutput();
         } else {
             if (data.modChanged === false) {
                 data.prevElement.innerText += parsedKey;
@@ -239,12 +268,8 @@ function handleKeyPress(keyName) {
             data.prevElement.innerText += parsedKey;
         }
     }
+    breakIfNeeded(keyName, parsedKey);
 
-    if (data.prevElement.innerText.length > config.options.maxLength) {
-        data.modChanged = true;
-    } else {
-        data.modChanged = false;
-    }
     data.lastKey = keyName;
     data.keyDown = true;
 }
@@ -253,8 +278,12 @@ function onKeyRelease(keyName) {
     let index = data.modifiers.indexOf(keyName);
     if (index !== -1) {
         data.modifiers.splice(index, 1);
-        data.modChanged = true;
-    } else {
+        if (!(config.options.shiftNotRealModifier && (keyName === "Shift_L" || keyName === "Shift_R"))) {
+            data.modChanged = true;
+        } else {
+            data.shiftChanged = true;
+        }
+    } else if (data.lastKey == keyName) {
         data.keyDown = false;
     }
 }
