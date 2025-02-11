@@ -4,10 +4,11 @@ const container = document.getElementById("keys");
 
 /*
  * TODO: 
- * [ ] 1. make divs float (rotate with sin + move up and down)
+ * [x] 1. make divs float (rotate with sin + move up and down)
  * [x] 2. Option to enable multiplier x23
  * [x] 3. Adding your own keyrepeat rate (or get it somehow)
  * [x] 4. Make shift be a separate config that you can set to just be the big version of letter
+ * [ ] 5. Fix breakOnInput (it'll spam output)
  */
 
 // Config provider.
@@ -22,8 +23,10 @@ let config = {
 
 function setConfig(newConfig) {
     config = newConfig;
+
     container.classList.add(config.options.rowLayout);
 
+    data.animationStyles = config.options.animationStyle.split("-");
     if (config.options.enableRepeat === true) {
         data.repeatRateMs = 1000.0 / config.options.repeatRate;
         setInterval(repeatKeys, 17);
@@ -53,6 +56,64 @@ function applyConfigStyling(element) {
     applyStyleConfig(element, "padding");
 }
 
+function animationJank(element) {
+    let animations = [];
+    let animationCompositions = [];
+
+    if (data.animationStyles.includes("default")) {
+        element.style.opacity = 0;
+        animationCompositions.push("replace");
+        animations.push("anim-default 100ms ease-in forwards");
+    }
+
+    if (data.animationStyles.includes("shutter")) {
+        element.style.transform = "rotateX(-90deg)";
+        animationCompositions.push("replace");
+        animations.push("anim-shutter 100ms ease-in forwards");
+    }
+
+    if (data.animationStyles.includes("combo")) {
+        animationCompositions.push("add");
+        animations.push("anim-combo paused 1s ease-in-out");
+    }
+
+    if (data.animationStyles.includes("sway")) {
+        animationCompositions.push("add");
+        animations.push("anim-sway 10s linear infinite");
+    }
+
+    if (data.animationStyles.includes("float")) {
+        animationCompositions.push("add");
+        animations.push("anim-float 7s linear infinite");
+    }
+
+    element.style.animation = animations.map((anim) => anim).join(", ");
+    element.style["animation-composition"] = animationCompositions.map((comp) => comp).join(", ");
+
+}
+
+function animationComboJank() {
+    let splitOnX = data.repeatComboString.split("x");
+
+    if (splitOnX < 2) {
+        return;
+    }
+    let oldVal = Number(splitOnX.slice(-1)[0]);
+    if (oldVal === NaN) {
+        return;
+    }
+    if (Math.floor(oldVal / 100) === Math.floor(data.repeat / 100)) {
+        return;
+    }
+    let comboAnimIdx = data.prevElement.style["animation-name"].split(", ").indexOf('anim-combo');
+    if (comboAnimIdx === -1) {
+        return;
+    }
+    let playStateArr = data.prevElement.style["animation-play-state"].split(", ");
+    playStateArr[comboAnimIdx] = 'running';
+    data.prevElement.style["animation-play-state"] = playStateArr.join(", ");
+}
+
 const sortModifiers = (a, b) => {
     if (config.modifierKeys[a] > config.modifierKeys[b]) {
         return 1;
@@ -64,6 +125,7 @@ const sortModifiers = (a, b) => {
 }
 
 const data = {
+    animationStyles: [],
     lastKey: "",
     modifiers: [],
     modChanged: true,
@@ -100,6 +162,7 @@ function createDisplayText(parsedKey) {
 function createNewBlock(parsedKey) {
     const keyElement = document.createElement("div");
     keyElement.classList.add("key");
+    animationJank(keyElement);
     applyConfigStyling(keyElement);
 
     keyElement.innerText += createDisplayText(parsedKey);
@@ -135,6 +198,8 @@ function updateRepeatOutput() {
             }
         }
         if (data.repeat > 1) {
+            animationComboJank();
+
             data.repeatComboString = " x" + data.repeat;
             data.prevElement.innerText = 
                 data.prevElement.innerText.substring(0, data.prevElement.innerText.length - ln) +
@@ -166,7 +231,6 @@ function repeatKeys() {
             if (!data.repeatPastDelay) {
                 data.repeat++;
                 editOutput = true;
-                data.repeatPastDelay = true;
                 newLast = new Date(data.repeatLast.valueOf() + config.options.repeatDelay);
             }
 
