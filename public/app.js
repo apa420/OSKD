@@ -26,6 +26,7 @@ function setConfig(newConfig) {
     config = newConfig;
 
     container.classList.add(config.options.rowLayout);
+    document.getElementById("wrapper").classList.add(config.options.rowLayout);
 
     animationJankSetup();
     if (config.options.enableRepeat === true) {
