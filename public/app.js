@@ -8,7 +8,8 @@ const container = document.getElementById("keys");
  * [x] 2. Option to enable multiplier x23
  * [x] 3. Adding your own keyrepeat rate (or get it somehow)
  * [x] 4. Make shift be a separate config that you can set to just be the big version of letter
- * [ ] 5. Fix breakOnInput (it'll spam output)
+ * [x] 5. Fix breakOnInput (it'll spam output)
+ * [x] 6. Animation system
  */
 
 // Config provider.
@@ -243,7 +244,7 @@ function updateRepeatOutput() {
 
 function repeatKeys() {
     if (data.keyDown) {
-        if (data.modChanged === true) {
+        if (data.modChanged === true && !config.breakOnInput.includes(data.lastKey)) {
             handleKeyPress(data.lastKey);
         }
         let rn = Date.now();
