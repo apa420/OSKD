@@ -1,9 +1,8 @@
 {
   "options": {
     "rowLayout": "right-to-left",
-    "animationStyle": "shutter-sway-combo-float",
-    "animationCombo": true,
-    "animationCombo": true,
+    "animationStyle": "shutter-sway-float",
+    "animationCombo": "combo-shake",
     "repeatRate": 75,
     "repeatDelay": 160,
     "enableRepeat": true,

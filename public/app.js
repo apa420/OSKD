@@ -26,7 +26,7 @@ function setConfig(newConfig) {
 
     container.classList.add(config.options.rowLayout);
 
-    data.animationStyles = config.options.animationStyle.split("-");
+    animationJankSetup();
     if (config.options.enableRepeat === true) {
         data.repeatRateMs = 1000.0 / config.options.repeatRate;
         setInterval(repeatKeys, 17);
@@ -56,25 +56,20 @@ function applyConfigStyling(element) {
     applyStyleConfig(element, "padding");
 }
 
-function animationJank(element) {
+function animationJankSetup() {
+    data.animationStyles = config.options.animationStyle.split("-");
+
     let animations = [];
     let animationCompositions = [];
 
     if (data.animationStyles.includes("default")) {
-        element.style.opacity = 0;
         animationCompositions.push("replace");
         animations.push("anim-default 100ms ease-in forwards");
     }
 
     if (data.animationStyles.includes("shutter")) {
-        element.style.transform = "rotateX(-90deg)";
         animationCompositions.push("replace");
         animations.push("anim-shutter 100ms ease-in forwards");
-    }
-
-    if (data.animationStyles.includes("combo")) {
-        animationCompositions.push("add");
-        animations.push("anim-combo paused 1s ease-in-out");
     }
 
     if (data.animationStyles.includes("sway")) {
@@ -86,10 +81,40 @@ function animationJank(element) {
         animationCompositions.push("add");
         animations.push("anim-float 7s linear infinite");
     }
+    data.animationStyleText = animations.map((anim) => anim).join(", ");
+    data.animationCompositions = animationCompositions.map((comp) => comp).join(", ");
 
-    element.style.animation = animations.map((anim) => anim).join(", ");
-    element.style["animation-composition"] = animationCompositions.map((comp) => comp).join(", ");
+    // combos
+    data.animationCombos = config.options.animationCombo.split("-");
 
+    let combos = [];
+    let comboCompositions = [];
+
+    if (data.animationCombos.includes("combo")) {
+        comboCompositions.push("accumulate");
+        combos.push("anim-combo 1s ease-in-out both");
+    }
+    if (data.animationCombos.includes("shake")) {
+        comboCompositions.push("add");
+        combos.push("anim-shake 0.5s linear 2");
+    }
+    if (animations.length > 0) {
+        data.animationCombosText += ", ";
+        data.animationComboCompositions += ", ";
+    }
+    data.animationCombosText += combos.map((comb) => comb).join(", ");
+    data.animationComboCompositions += comboCompositions.map((comp) => comp).join(", ");
+}
+
+function animationJank(element) {
+    if (data.animationStyles.includes("default")) {
+        element.style.opacity = 0;
+    }
+    if (data.animationStyles.includes("shutter")) {
+        element.style.transform = "rotateX(-90deg)";
+    }
+    element.style.animation = data.animationStyleText;
+    element.style["animation-composition"] = data.animationCompositions;
 }
 
 function animationComboJank() {
@@ -105,13 +130,8 @@ function animationComboJank() {
     if (Math.floor(oldVal / 100) === Math.floor(data.repeat / 100)) {
         return;
     }
-    let comboAnimIdx = data.prevElement.style["animation-name"].split(", ").indexOf('anim-combo');
-    if (comboAnimIdx === -1) {
-        return;
-    }
-    let playStateArr = data.prevElement.style["animation-play-state"].split(", ");
-    playStateArr[comboAnimIdx] = 'running';
-    data.prevElement.style["animation-play-state"] = playStateArr.join(", ");
+    data.prevElement.style.animation += data.animationCombosText;
+    data.prevElement.style["animation-composition"] += data.animationComboCompositions;
 }
 
 const sortModifiers = (a, b) => {
@@ -126,6 +146,11 @@ const sortModifiers = (a, b) => {
 
 const data = {
     animationStyles: [],
+    animaitonStyleText: "",
+    animationCompositions: "",
+    animationCombos: [],
+    animationCombosText: "",
+    animationComboCompositions: "",
     lastKey: "",
     modifiers: [],
     modChanged: true,
